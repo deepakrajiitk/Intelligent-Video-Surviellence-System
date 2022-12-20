@@ -1,4 +1,6 @@
 .vscode/
+*.mp4
+weights/
 
 # interpreter bytecode
 __pycache__/
