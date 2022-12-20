@@ -22,7 +22,7 @@ This repository contains a highly configurable two-stage-tracker that adjusts to
 ## Installation
 
 ```
-git clone --recurse-submodules https://github.com/mikel-brostrom/Yolov5_StrongSORT_OSNet.git  # clone recursively
+git clone --recurse-submodules https://github.com/deepakrajiitk/Intelligent-Video-Surviellence-System.git  # clone recursively
 cd Yolov5_StrongSORT_OSNet
 pip install -r requirements.txt  # install dependencies
 ```
