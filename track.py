@@ -14,6 +14,10 @@ import numpy as np
 from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
+from torchvision import transforms as T
+import json
+from PIL import Image
+
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
@@ -25,6 +29,7 @@ if str(ROOT / 'yolov5') not in sys.path:
     sys.path.append(str(ROOT / 'yolov5'))  # add yolov5 ROOT to PATH
 if str(ROOT / 'trackers' / 'strong_sort') not in sys.path:
     sys.path.append(str(ROOT / 'trackers' / 'strong_sort'))  # add strong_sort ROOT to PATH
+sys.path.append(str(ROOT/'Person_Attribute_Recognition_MarketDuke')) # add parm ROOT to PATH
 
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
@@ -37,10 +42,136 @@ from yolov5.utils.torch_utils import select_device, time_sync
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from utils.segment.general import masks2segments, process_mask, process_mask_native
 from trackers.multi_tracker_zoo import create_tracker
+from Person_Attribute_Recognition_MarketDuke.net import get_model
 
+######################################################################
+#mySQL Database Settings
+import mysql.connector
+
+class NumpyMySQLConverter(mysql.connector.conversion.MySQLConverter):
+    """ A mysql.connector Converter that handles Numpy types """
+
+    def _float32_to_mysql(self, value):
+        return float(value)
+
+    def _float64_to_mysql(self, value):
+        return float(value)
+
+    def _int32_to_mysql(self, value):
+        return int(value)
+
+    def _int64_to_mysql(self, value):
+        return int(value)
+
+# connecting to database
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="root",
+  password="",
+  database="mydatabase"
+)
+mydb.set_converter_class(NumpyMySQLConverter)
+mycursor = mydb.cursor()
+# query format
+table_creation_query = "CREATE TABLE if not exists CCTV_Table \
+(date VARCHAR(255) NOT NULL, \
+video_id VARCHAR(255) NOT NULL, \
+person_id VARCHAR(255) NOT NULL, \
+timeframe VARCHAR(255) NOT NULL, \
+young float NOT NULL, \
+teenager float NOT NULL, \
+adult float NOT NULL, \
+old float NOT NULL, \
+backpack float NOT NULL, \
+bag float NOT NULL, \
+handbag float NOT NULL, \
+clothes float NOT NULL, \
+down float NOT NULL, \
+up float NOT NULL, \
+hair float NOT NULL, \
+hat float NOT NULL, \
+gender float NOT NULL, \
+upblack float NOT NULL, \
+upwhite float NOT NULL, \
+upred float NOT NULL, \
+uppurple float NOT NULL, \
+upyellow float NOT NULL, \
+upgrey float NOT NULL, \
+upblue float NOT NULL, \
+upgreen float NOT NULL, \
+downblack float NOT NULL, \
+downwhite float NOT NULL, \
+downpink float NOT NULL, \
+downpurple float NOT NULL, \
+downyellow float NOT NULL, \
+downgrey float NOT NULL, \
+downblue float NOT NULL, \
+downgreen float NOT NULL, \
+downbrown float NOT NULL)"
+mycursor.execute(table_creation_query);
+query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
+       backpack, bag, handbag, clothes, down, up, hair, hat, \
+       gender, upblack, upwhite, upred, uppurple, upyellow, \
+       upgrey, upblue, upgreen, downblack, downwhite, downpink, \
+       downpurple, downyellow, downgrey, downblue, downgreen, \
+       downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+
+######################################################################
+# PAR Settings
+# ---------
+dataset_dict = {
+    'market'  :  'Market-1501',
+    'duke'  :  'DukeMTMC-reID',
+}
+num_cls_dict = { 'market':30, 'duke':23 }
+num_ids_dict = { 'market':751, 'duke':702 }
+
+transforms = T.Compose([
+    T.Resize(size=(288, 144)),
+    T.ToTensor(),
+    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
+
+######################################################################
+# PAR Model and Data
+# ---------
+def load_network(network, dataset, par_model_name):
+    save_path = os.path.join('./Person_Attribute_Recognition_MarketDuke/checkpoints', dataset, par_model_name, 'net_last.pth')
+    network.load_state_dict(torch.load(save_path))
+    print('Resume model from {}'.format(save_path))
+    return network
+
+def load_image(src):
+    # src = Image.open(path)
+    src = transforms(src)
+    src = src.unsqueeze(dim=0)
+    return src
+
+######################################################################
+# PAR Inference
+# ---------
+class predict_decoder(object):
+
+    def __init__(self, dataset):
+        with open('./Person_Attribute_Recognition_MarketDuke/doc/label.json', 'r') as f:
+            self.label_list = json.load(f)[dataset]
+        with open('./Person_Attribute_Recognition_MarketDuke/doc/attribute.json', 'r') as f:
+            self.attribute_dict = json.load(f)[dataset]
+        self.dataset = dataset
+        self.num_label = len(self.label_list)
+
+    def decode(self, pred):
+        pred = pred.squeeze(dim=0)
+        # print(self.attribute_dict)
+        for idx in range(self.num_label):
+            name, chooce = self.attribute_dict[self.label_list[idx]]
+            if chooce[pred[idx]]:
+                print('{}: {}'.format(name, chooce[pred[idx]]))
 
 @torch.no_grad()
 def run(
+        date='01_01_2022',
+        video_id='0',
         source='0',
         yolo_weights=WEIGHTS / 'yolov5m.pt',  # model.pt path(s),
         reid_weights=WEIGHTS / 'osnet_x0_25_msmt17.pt',  # model.pt path,
@@ -73,6 +204,11 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
         retina_masks=False,
+        image_path = "",
+        dataset = "market",
+        backbone = "resnet50",
+        use_id = True,
+        frame_skip = 0,
 ):
 
     source = str(source)
@@ -101,6 +237,14 @@ def run(
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
+    # Load PAR model
+    par_model_name = '{}_nfc_id'.format(backbone) if use_id else '{}_nfc'.format(backbone)
+    num_label, num_id = num_cls_dict[dataset], num_ids_dict[dataset]
+    par_model = get_model(par_model_name, num_label, use_id=use_id, num_id=num_id)
+    par_model = load_network(par_model, dataset, par_model_name)
+    par_model.eval()
+    Dec = predict_decoder(dataset)
+
     # Dataloader
     if webcam:
         show_vid = check_imshow()
@@ -126,6 +270,11 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile(), Profile())
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
+
+        # skipping frames
+        if(frame_skip!=0 and frame_idx%frame_skip!=0):
+            continue;
+
         with dt[0]:
             im = torch.from_numpy(im).to(device)
             im = im.half() if half else im.float()  # uint8 to fp16/32
@@ -243,7 +392,30 @@ def run(
                                 tracker_list[i].trajectory(im0, q, color=color)
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                                save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                                # save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                                image_file_name = str(date)+"_"+str(video_id)+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
+                                # print("============", save_dir)
+                                crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
+                                # getting attributes using PAR
+                                # tracking only persons (class 0)
+                                if(c==0):
+                                    t6 = time_sync()
+                                    crop_image = load_image(Image.fromarray(crop[..., ::-1]))
+                                    if not use_id:
+                                        out = par_model.forward(crop_image)
+                                    else:
+                                        out, _ = par_model.forward(crop_image)
+                                    values = list(out.numpy()[0])
+                                    values.insert(0, str(frame_idx))
+                                    values.insert(0, str(id))
+                                    values.insert(0, str(video_id))
+                                    values.insert(0, str(date))
+                                    # print(values)
+                                    mycursor.execute(query, values)
+                                    mydb.commit()
+                                    # pred = torch.gt(out, torch.ones_like(out)/2 )  # threshold=0.5
+                                    # Dec.decode(pred)
+                                    t7 = time_sync();
                 
             else:
                 pass
@@ -326,7 +498,14 @@ def parse_opt():
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
+    parser.add_argument('--image_path', help='Path to test image for person attribute recognition(PAR')
+    parser.add_argument('--dataset', default='market', type=str, help='dataset for PAR')
+    parser.add_argument('--backbone', default='resnet50', type=str, help='model for PAR')
+    parser.add_argument('--use-id', action='store_true', help='use identity loss for PAR')
+    parser.add_argument('--frame-skip', default=0, type=int, help='number of frames to skip')
     opt = parser.parse_args()
+    assert opt.dataset in ['market', 'duke']
+    assert opt.backbone in ['resnet50', 'resnet34', 'resnet18', 'densenet121']
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
     return opt
