@@ -45,6 +45,7 @@ from trackers.multi_tracker_zoo import create_tracker
 from Person_Attribute_Recognition_MarketDuke.net import get_model
 
 ######################################################################
+
 #mySQL Database Settings
 import mysql.connector
 
@@ -123,8 +124,8 @@ class Database:
         self.mydb.commit()
 
 ######################################################################
+
 # PAR Settings
-# ---------
 dataset_dict = {
     'market'  :  'Market-1501',
     'duke'  :  'DukeMTMC-reID',
@@ -139,8 +140,8 @@ transforms = T.Compose([
 ])
 
 ######################################################################
+
 # PAR Model and Data
-# ---------
 def load_network(network, dataset, par_model_name):
     save_path = os.path.join('./Person_Attribute_Recognition_MarketDuke/checkpoints', dataset, par_model_name, 'net_last.pth')
     network.load_state_dict(torch.load(save_path))
@@ -154,8 +155,8 @@ def load_image(src):
     return src
 
 ######################################################################
+
 # PAR Inference
-# ---------
 class predict_decoder(object):
 
     def __init__(self, dataset):
@@ -173,6 +174,9 @@ class predict_decoder(object):
             name, chooce = self.attribute_dict[self.label_list[idx]]
             if chooce[pred[idx]]:
                 print('{}: {}'.format(name, chooce[pred[idx]]))
+
+######################################################################
+
 
 @torch.no_grad()
 def run(
