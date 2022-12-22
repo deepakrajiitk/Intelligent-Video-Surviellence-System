@@ -63,58 +63,64 @@ class NumpyMySQLConverter(mysql.connector.conversion.MySQLConverter):
     def _int64_to_mysql(self, value):
         return int(value)
 
-# connecting to database
-mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  password="",
-  database="mydatabase"
-)
-mydb.set_converter_class(NumpyMySQLConverter)
-mycursor = mydb.cursor()
-# query format
-table_creation_query = "CREATE TABLE if not exists CCTV_Table \
-(date VARCHAR(255) NOT NULL, \
-video_id VARCHAR(255) NOT NULL, \
-person_id VARCHAR(255) NOT NULL, \
-timeframe VARCHAR(255) NOT NULL, \
-young float NOT NULL, \
-teenager float NOT NULL, \
-adult float NOT NULL, \
-old float NOT NULL, \
-backpack float NOT NULL, \
-bag float NOT NULL, \
-handbag float NOT NULL, \
-clothes float NOT NULL, \
-down float NOT NULL, \
-up float NOT NULL, \
-hair float NOT NULL, \
-hat float NOT NULL, \
-gender float NOT NULL, \
-upblack float NOT NULL, \
-upwhite float NOT NULL, \
-upred float NOT NULL, \
-uppurple float NOT NULL, \
-upyellow float NOT NULL, \
-upgrey float NOT NULL, \
-upblue float NOT NULL, \
-upgreen float NOT NULL, \
-downblack float NOT NULL, \
-downwhite float NOT NULL, \
-downpink float NOT NULL, \
-downpurple float NOT NULL, \
-downyellow float NOT NULL, \
-downgrey float NOT NULL, \
-downblue float NOT NULL, \
-downgreen float NOT NULL, \
-downbrown float NOT NULL)"
-mycursor.execute(table_creation_query);
-query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
-       backpack, bag, handbag, clothes, down, up, hair, hat, \
-       gender, upblack, upwhite, upred, uppurple, upyellow, \
-       upgrey, upblue, upgreen, downblack, downwhite, downpink, \
-       downpurple, downyellow, downgrey, downblue, downgreen, \
-       downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+class Database:
+    def __init__(self):
+        # connecting to database
+        self.mydb = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="mydatabase"
+        )
+        self.mydb.set_converter_class(NumpyMySQLConverter)
+        self.mycursor = self.mydb.cursor()
+        # query format
+        table_creation_query = "CREATE TABLE if not exists CCTV_Table \
+        (date VARCHAR(255) NOT NULL, \
+        video_id VARCHAR(255) NOT NULL, \
+        person_id VARCHAR(255) NOT NULL, \
+        timeframe VARCHAR(255) NOT NULL, \
+        young float NOT NULL, \
+        teenager float NOT NULL, \
+        adult float NOT NULL, \
+        old float NOT NULL, \
+        backpack float NOT NULL, \
+        bag float NOT NULL, \
+        handbag float NOT NULL, \
+        clothes float NOT NULL, \
+        down float NOT NULL, \
+        up float NOT NULL, \
+        hair float NOT NULL, \
+        hat float NOT NULL, \
+        gender float NOT NULL, \
+        upblack float NOT NULL, \
+        upwhite float NOT NULL, \
+        upred float NOT NULL, \
+        uppurple float NOT NULL, \
+        upyellow float NOT NULL, \
+        upgrey float NOT NULL, \
+        upblue float NOT NULL, \
+        upgreen float NOT NULL, \
+        downblack float NOT NULL, \
+        downwhite float NOT NULL, \
+        downpink float NOT NULL, \
+        downpurple float NOT NULL, \
+        downyellow float NOT NULL, \
+        downgrey float NOT NULL, \
+        downblue float NOT NULL, \
+        downgreen float NOT NULL, \
+        downbrown float NOT NULL)"
+        self.mycursor.execute(table_creation_query);
+        self.query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
+            backpack, bag, handbag, clothes, down, up, hair, hat, \
+            gender, upblack, upwhite, upred, uppurple, upyellow, \
+            upgrey, upblue, upgreen, downblack, downwhite, downpink, \
+            downpurple, downyellow, downgrey, downblue, downgreen, \
+            downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+
+    def insert(self, values):
+        self.mycursor.execute(self.query, values)
+        self.mydb.commit()
 
 ######################################################################
 # PAR Settings
@@ -205,10 +211,11 @@ def run(
         vid_stride=1,  # video frame-rate stride
         retina_masks=False,
         image_path = "",
-        dataset = "market",
-        backbone = "resnet50",
-        use_id = True,
-        frame_skip = 0,
+        dataset="market",
+        backbone="resnet50",
+        use_id=True,
+        frame_skip=0,
+        save_db=False #save to SQL database
 ):
 
     source = str(source)
@@ -264,6 +271,9 @@ def run(
             if hasattr(tracker_list[i].model, 'warmup'):
                 tracker_list[i].model.warmup()
     outputs = [None] * nr_sources
+
+    # creating database object
+    db = Database()
 
     # Run tracking
     #model.warmup(imgsz=(1 if pt else nr_sources, 3, *imgsz))  # warmup
@@ -379,7 +389,7 @@ def run(
                                 f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
                                                                bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
 
-                        if save_vid or save_crop or show_vid:  # Add bbox to image
+                        if save_vid or save_crop or show_vid or save_db:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
@@ -390,7 +400,7 @@ def run(
                             if save_trajectories and tracking_method == 'strongsort':
                                 q = output[7]
                                 tracker_list[i].trajectory(im0, q, color=color)
-                            if save_crop:
+                            if save_crop or save_db:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 # save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                                 image_file_name = str(date)+"_"+str(video_id)+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
@@ -398,7 +408,7 @@ def run(
                                 crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
                                 # getting attributes using PAR
                                 # tracking only persons (class 0)
-                                if(c==0):
+                                if(c==0 and save_db):
                                     t6 = time_sync()
                                     crop_image = load_image(Image.fromarray(crop[..., ::-1]))
                                     if not use_id:
@@ -411,8 +421,10 @@ def run(
                                     values.insert(0, str(video_id))
                                     values.insert(0, str(date))
                                     # print(values)
-                                    mycursor.execute(query, values)
-                                    mydb.commit()
+                                    # adding values to the database
+                                    db.insert(values);
+                                    # mycursor.execute(query, values)
+                                    # mydb.commit()
                                     # pred = torch.gt(out, torch.ones_like(out)/2 )  # threshold=0.5
                                     # Dec.decode(pred)
                                     t7 = time_sync();
@@ -503,6 +515,7 @@ def parse_opt():
     parser.add_argument('--backbone', default='resnet50', type=str, help='model for PAR')
     parser.add_argument('--use-id', action='store_true', help='use identity loss for PAR')
     parser.add_argument('--frame-skip', default=0, type=int, help='number of frames to skip')
+    parser.add_argument('--save-db', action='store_true', help='save to SQL database')
     opt = parser.parse_args()
     assert opt.dataset in ['market', 'duke']
     assert opt.backbone in ['resnet50', 'resnet34', 'resnet18', 'densenet121']
