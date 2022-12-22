@@ -17,6 +17,7 @@ import torch.backends.cudnn as cudnn
 from torchvision import transforms as T
 import json
 from PIL import Image
+import multiprocessing as mp
 
 
 FILE = Path(__file__).resolve()
@@ -532,7 +533,26 @@ def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
+import time
+def single_process(opt):
+    start_time = time.time()
+    main(opt)
+    end_time = time.time()
+    total_processing_time = end_time - start_time
+    print("Time taken in single: {}".format(total_processing_time))
+
+def multiple_process(opt):
+    start_time = time.time()
+    num_processes = mp.cpu_count()
+    p = mp.Pool(num_processes)
+    args = [opt]*num_processes
+    p.map(main, args)
+    end_time = time.time()
+    total_processing_time = end_time - start_time
+    print("Time taken in multiple: {}".format(total_processing_time))
 
 if __name__ == "__main__":
     opt = parse_opt()
-    main(opt)
+    single_process(opt)
+    multiple_process(opt)
+    # main(opt)
