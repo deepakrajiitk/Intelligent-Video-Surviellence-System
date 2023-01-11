@@ -75,8 +75,83 @@ class Database:
         )
         self.mydb.set_converter_class(NumpyMySQLConverter)
         self.mycursor = self.mydb.cursor()
+        self.attributes = ["young", "teenager", "adult", "old", "backpack", "bag", "handbag", "clothes", "down", "up",
+        "hair", "hat", "gender", "upblack", "upwhite", "upred", "uppurple", "upyellow", "upgrey", "upblue", "upgreen", "downblack", "downwhite", "downpink",
+        "downpurple", "downyellow", "downgrey", "downblue", "downgreen", "downbrown"]
+        self.table_name = "cctv_table"
+        self.threshold = 0.5
+        # table is created one time only
+        self.create_main_table()
         # query format
-        table_creation_query = "CREATE TABLE if not exists CCTV_Table \
+        # table_creation_query = "CREATE TABLE if not exists CCTV_Table \
+        # (date VARCHAR(255) NOT NULL, \
+        # video_id VARCHAR(255) NOT NULL, \
+        # person_id VARCHAR(255) NOT NULL, \
+        # timeframe VARCHAR(255) NOT NULL, \
+        # young float NOT NULL, \
+        # teenager float NOT NULL, \
+        # adult float NOT NULL, \
+        # old float NOT NULL, \
+        # backpack float NOT NULL, \
+        # bag float NOT NULL, \
+        # handbag float NOT NULL, \
+        # clothes float NOT NULL, \
+        # down float NOT NULL, \
+        # up float NOT NULL, \
+        # hair float NOT NULL, \
+        # hat float NOT NULL, \
+        # gender float NOT NULL, \
+        # upblack float NOT NULL, \
+        # upwhite float NOT NULL, \
+        # upred float NOT NULL, \
+        # uppurple float NOT NULL, \
+        # upyellow float NOT NULL, \
+        # upgrey float NOT NULL, \
+        # upblue float NOT NULL, \
+        # upgreen float NOT NULL, \
+        # downblack float NOT NULL, \
+        # downwhite float NOT NULL, \
+        # downpink float NOT NULL, \
+        # downpurple float NOT NULL, \
+        # downyellow float NOT NULL, \
+        # downgrey float NOT NULL, \
+        # downblue float NOT NULL, \
+        # downgreen float NOT NULL, \
+        # downbrown float NOT NULL)"
+        # self.mycursor.execute(table_creation_query);
+        # self.query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
+        #     backpack, bag, handbag, clothes, down, up, hair, hat, \
+        #     gender, upblack, upwhite, upred, uppurple, upyellow, \
+        #     upgrey, upblue, upgreen, downblack, downwhite, downpink, \
+        #     downpurple, downyellow, downgrey, downblue, downgreen, \
+        #     downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    
+    def create_main_table(self):
+        # query format
+        table_creation_query = "create table if not exists "+ self.table_name+" (attributes text NOT NULL)";
+        self.mycursor.execute(table_creation_query);
+        query = "insert into " +self.table_name+ " (attributes) values (%s)";
+        for attribute in self.attributes:
+            self.add_to_main_table_column("attributes", attribute)
+        
+    def add_to_main_table_column(self, columnName, value):
+        query = "insert into " + self.table_name + " (" + columnName + ") " + " values (%s)"
+        self.mycursor.execute(query, [value])
+        self.mydb.commit();
+    
+    def main_table_insert(self, video_id):
+        column_name = video_id
+        query1 = "alter table " +self.table_name+ " add column if not exists " +column_name+ " int"
+        print(query1)
+        self.mycursor.execute(query1)
+        for i in range(len(self.attributes)):
+            query2 = "update " +self.table_name+ " set " +column_name+ " = " + "(select count(*) from " +column_name+ " where " +self.attributes[i]+ ">" +str(self.threshold)+ ") " + " where attributes = '" +self.attributes[i]+ "'";
+            # print(query2)
+            self.mycursor.execute(query2)
+        self.mydb.commit()
+    
+    def create_video_table(self, table_name):
+        table_creation_query = "CREATE TABLE if not exists "+table_name+" \
         (date VARCHAR(255) NOT NULL, \
         video_id VARCHAR(255) NOT NULL, \
         person_id VARCHAR(255) NOT NULL, \
@@ -112,16 +187,22 @@ class Database:
         downgreen float NOT NULL, \
         downbrown float NOT NULL)"
         self.mycursor.execute(table_creation_query);
-        self.query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
+        self.mydb.commit()
+    
+    def video_table_insert(self, table_name, values):
+        table_insertion_query = "insert into " +table_name+" (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
             backpack, bag, handbag, clothes, down, up, hair, hat, \
             gender, upblack, upwhite, upred, uppurple, upyellow, \
             upgrey, upblue, upgreen, downblack, downwhite, downpink, \
             downpurple, downyellow, downgrey, downblue, downgreen, \
             downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-
-    def insert(self, values):
-        self.mycursor.execute(self.query, values)
+        self.mycursor.execute(table_insertion_query, values)
         self.mydb.commit()
+
+
+    # def insert(self, values):
+    #     self.mycursor.execute(self.query, values)
+    #     self.mydb.commit()
 
 ######################################################################
 
@@ -181,7 +262,7 @@ class predict_decoder(object):
 @torch.no_grad()
 def run(
         date='01_01_2022',
-        video_id='0',
+        video_id='video_0',
         source='0',
         yolo_weights=WEIGHTS / 'yolov5m.pt',  # model.pt path(s),
         reid_weights=WEIGHTS / 'osnet_x0_25_msmt17.pt',  # model.pt path,
@@ -229,6 +310,8 @@ def run(
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
     if is_url and is_file:
         source = check_file(source)  # download
+    video_id = source[:-4]
+    
 
     # Directories
     if not isinstance(yolo_weights, list):  # single yolo model
@@ -277,7 +360,10 @@ def run(
     outputs = [None] * nr_sources
 
     # creating database object
-    db = Database()
+    if save_db:
+        db = Database()
+        # creating video table
+        db.create_video_table(video_id)
 
     # Run tracking
     #model.warmup(imgsz=(1 if pt else nr_sources, 3, *imgsz))  # warmup
@@ -407,7 +493,7 @@ def run(
                             if save_crop or save_db:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 # save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
-                                image_file_name = str(date)+"_"+str(video_id)+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
+                                image_file_name = str(date)+"_"+video_id+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
                                 # print("============", save_dir)
                                 crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
                                 # getting attributes using PAR
@@ -426,7 +512,7 @@ def run(
                                     values.insert(0, str(date))
                                     # print(values)
                                     # adding values to the database
-                                    db.insert(values);
+                                    db.video_table_insert(video_id, values)
                                     # mycursor.execute(query, values)
                                     # mydb.commit()
                                     # pred = torch.gt(out, torch.ones_like(out)/2 )  # threshold=0.5
@@ -468,6 +554,11 @@ def run(
             
         # Print total time (preprocessing + inference + NMS + tracking)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{sum([dt.dt for dt in dt if hasattr(dt, 'dt')]) * 1E3:.1f}ms")
+    
+    # inserting new video data on main table
+    if save_db:
+        db.main_table_insert(video_id)
+
 
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
