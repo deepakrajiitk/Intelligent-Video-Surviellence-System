@@ -71,7 +71,7 @@ class Database:
         host="localhost",
         user="root",
         password="",
-        database="mydatabase"
+        database="cctv_database"
         )
         self.mydb.set_converter_class(NumpyMySQLConverter)
         self.mycursor = self.mydb.cursor()
@@ -82,50 +82,7 @@ class Database:
         self.threshold = 0.5
         # table is created one time only
         self.create_main_table()
-        # query format
-        # table_creation_query = "CREATE TABLE if not exists CCTV_Table \
-        # (date VARCHAR(255) NOT NULL, \
-        # video_id VARCHAR(255) NOT NULL, \
-        # person_id VARCHAR(255) NOT NULL, \
-        # timeframe VARCHAR(255) NOT NULL, \
-        # young float NOT NULL, \
-        # teenager float NOT NULL, \
-        # adult float NOT NULL, \
-        # old float NOT NULL, \
-        # backpack float NOT NULL, \
-        # bag float NOT NULL, \
-        # handbag float NOT NULL, \
-        # clothes float NOT NULL, \
-        # down float NOT NULL, \
-        # up float NOT NULL, \
-        # hair float NOT NULL, \
-        # hat float NOT NULL, \
-        # gender float NOT NULL, \
-        # upblack float NOT NULL, \
-        # upwhite float NOT NULL, \
-        # upred float NOT NULL, \
-        # uppurple float NOT NULL, \
-        # upyellow float NOT NULL, \
-        # upgrey float NOT NULL, \
-        # upblue float NOT NULL, \
-        # upgreen float NOT NULL, \
-        # downblack float NOT NULL, \
-        # downwhite float NOT NULL, \
-        # downpink float NOT NULL, \
-        # downpurple float NOT NULL, \
-        # downyellow float NOT NULL, \
-        # downgrey float NOT NULL, \
-        # downblue float NOT NULL, \
-        # downgreen float NOT NULL, \
-        # downbrown float NOT NULL)"
-        # self.mycursor.execute(table_creation_query);
-        # self.query = "insert into CCTV_Table (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
-        #     backpack, bag, handbag, clothes, down, up, hair, hat, \
-        #     gender, upblack, upwhite, upred, uppurple, upyellow, \
-        #     upgrey, upblue, upgreen, downblack, downwhite, downpink, \
-        #     downpurple, downyellow, downgrey, downblue, downgreen, \
-        #     downbrown) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    
+
     def create_main_table(self):
         # query format
         table_creation_query = "create table if not exists "+ self.table_name+" (attributes text NOT NULL)";
