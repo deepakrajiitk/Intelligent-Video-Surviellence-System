@@ -81,7 +81,7 @@ class Database:
         self.table_name = "cctv_table"
         self.threshold = 0.5
         # table is created one time only
-        self.create_main_table()
+        # self.create_main_table()
 
     def create_main_table(self):
         # query format
