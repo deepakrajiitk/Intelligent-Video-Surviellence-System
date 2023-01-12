@@ -398,12 +398,13 @@ def run(
                         det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
                         
                     # Mask plotting
-                    annotator.masks(
-                        masks,
-                        colors=[colors(x, True) for x in det[:, 5]],
-                        im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
-                        255 if retina_masks else im[i]
-                    )
+                    # below code is used to apply red color to the exact entity
+                    # annotator.masks(
+                    #     masks,
+                    #     colors=[colors(x, True) for x in det[:, 5]],
+                    #     im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
+                    #     255 if retina_masks else im[i]
+                    # )
                 else:
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 
@@ -455,7 +456,7 @@ def run(
                                 crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
                                 # getting attributes using PAR
                                 # tracking only persons (class 0)
-                                if(c==0 and save_db):
+                                if(c==0 and save_db and len(crop)!=0):
                                     t6 = time_sync()
                                     crop_image = load_image(Image.fromarray(crop[..., ::-1]))
                                     if not use_id:
