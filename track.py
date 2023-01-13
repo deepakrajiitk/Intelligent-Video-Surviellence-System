@@ -388,6 +388,7 @@ def run(
                     tracker_list[i].tracker.camera_update(prev_frames[i], curr_frames[i])
 
             if det is not None and len(det):
+                # below part is to show red and bounding box over cropped image
                 if is_seg:
                     # scale bbox first the crop masks
                     if retina_masks:
@@ -399,12 +400,12 @@ def run(
                         
                     # Mask plotting
                     # below code is used to apply red color to the exact entity
-                    # annotator.masks(
-                    #     masks,
-                    #     colors=[colors(x, True) for x in det[:, 5]],
-                    #     im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
-                    #     255 if retina_masks else im[i]
-                    # )
+                    annotator.masks(
+                        masks,
+                        colors=[colors(x, True) for x in det[:, 5]],
+                        im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
+                        255 if retina_masks else im[i]
+                    )
                 else:
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 

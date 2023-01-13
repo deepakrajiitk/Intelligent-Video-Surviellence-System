@@ -1,5 +1,6 @@
 .vscode/
 *.mp4
+*.avi
 weights/
 
 # interpreter bytecode
