@@ -1,0 +1,1 @@
+ffmpeg -i source-file.foo -ss  600 -t 600 second-10-min.m4v

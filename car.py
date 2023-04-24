@@ -14,12 +14,15 @@ import platform
 import numpy as np
 from pathlib import Path
 import torch
+import time
 import torch.backends.cudnn as cudnn
 from torchvision import transforms as T
 import json
 from PIL import Image
 from datetime import timedelta
 
+
+from colorFinder import *
 
 
 FILE = Path(__file__).resolve()
@@ -84,13 +87,13 @@ class Database:
         self.table_name = "cctv_table"
         self.threshold = 0.5
         # table is created one time only
-        # self.create_main_table()
+        self.create_main_table()
 
     def create_main_table(self):
         # query format
         table_creation_query = "create table if not exists "+ self.table_name+" (attributes text NOT NULL)";
         self.mycursor.execute(table_creation_query);
-        # query = "insert into " +self.table_name+ " (attributes) values (%s)";
+        query = "insert into " +self.table_name+ " (attributes) values (%s)";
         for attribute in self.attributes:
             self.add_to_main_table_column("attributes", attribute)
         
@@ -101,19 +104,14 @@ class Database:
     
     def main_table_insert(self, video_id):
         column_name = video_id
-        check_query = "SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = '{}' AND COLUMN_NAME = '{}'".format(self.table_name, column_name)
-        self.mycursor.execute(check_query)
-        result = self.mycursor.fetchone()
-        if result is None:
-            query1 = "ALTER TABLE {} ADD COLUMN {} INT".format(self.table_name, column_name)
-            self.mycursor.execute(query1)
-
+        query1 = "alter table " +self.table_name+ " add column if not exists " +column_name+ " int"
+        print(query1)
+        self.mycursor.execute(query1)
         for i in range(len(self.attributes)):
-            query2 = "UPDATE {} SET {} = (SELECT COUNT(*) FROM {} WHERE {} > {}) WHERE attributes = '{}'".format(self.table_name, column_name, column_name, self.attributes[i], self.threshold, self.attributes[i])
+            query2 = "update " +self.table_name+ " set " +column_name+ " = " + "(select count(*) from " +column_name+ " where " +self.attributes[i]+ ">" +str(self.threshold)+ ") " + " where attributes = '" +self.attributes[i]+ "'";
+            # print(query2)
             self.mycursor.execute(query2)
-
         self.mydb.commit()
-
     
     def create_video_table(self, table_name):
         table_creation_query = "CREATE TABLE if not exists "+table_name+" \
@@ -155,7 +153,7 @@ class Database:
         self.mydb.commit()
     
     def video_table_insert(self, table_name, values):
-        table_insertion_query = "insert into " +table_name+" (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
+        table_insertion_query = "insert into " +table_name+ " (date, video_id, person_Id, timeframe, young, teenager, adult, old, \
             backpack, bag, handbag, clothes, down, up, hair, hat, \
             gender, upblack, upwhite, upred, uppurple, upyellow, \
             upgrey, upblue, upgreen, downblack, downwhite, downpink, \
@@ -164,10 +162,76 @@ class Database:
         self.mycursor.execute(table_insertion_query, values)
         self.mydb.commit()
 
-
     # def insert(self, values):
     #     self.mycursor.execute(self.query, values)
     #     self.mydb.commit()
+
+class CarDatabase:
+    def __init__(self):
+        # connecting to database
+        self.mydb = mysql.connector.connect(
+        host="localhost",
+        user="deepak",
+        password="deepak",
+        database="car_database"
+        )
+        self.mydb.set_converter_class(NumpyMySQLConverter)
+        self.mycursor = self.mydb.cursor()
+        self.attributes = ["red", "yellow", "green", "cyan", "blue", "pink", "white", "black", "gray"]
+        self.table_name = "car_table"
+        self.threshold = 0.5
+        # table is created one time only
+        self.create_main_table()
+
+    def create_main_table(self):
+        # query format
+        table_creation_query = "create table if not exists "+ self.table_name+" (attributes text NOT NULL)";
+        self.mycursor.execute(table_creation_query);
+        query = "insert into " +self.table_name+ " (attributes) values (%s)";
+        for attribute in self.attributes:
+            self.add_to_main_table_column("attributes", attribute)
+        
+    def add_to_main_table_column(self, columnName, value):
+        query = "insert into " + self.table_name + " (" + columnName + ") " + " values (%s)"
+        self.mycursor.execute(query, [value])
+        self.mydb.commit();
+    
+    def main_table_insert(self, video_id):
+        column_name = video_id
+        query1 = "alter table " +self.table_name+ " add column if not exists " +column_name+ " int"
+        print(query1)
+        self.mycursor.execute(query1)
+        for i in range(len(self.attributes)):
+            query2 = "update " +self.table_name+ " set " +column_name+ " = " + "(select count(*) from " +column_name+ " where " +self.attributes[i]+ ">" +str(self.threshold)+ ") " + " where attributes = '" +self.attributes[i]+ "'";
+            # print(query2)
+            self.mycursor.execute(query2)
+        self.mydb.commit()
+    
+    def create_video_table(self, table_name):
+        table_creation_query = "CREATE TABLE if not exists "+table_name+" \
+        (date VARCHAR(255) NOT NULL, \
+        video_id VARCHAR(255) NOT NULL, \
+        car_id VARCHAR(255) NOT NULL, \
+        timeframe VARCHAR(255) NOT NULL, \
+        red float NOT NULL, \
+        yellow float NOT NULL, \
+        green float NOT NULL, \
+        cyan float NOT NULL, \
+        blue float NOT NULL, \
+        pink float NOT NULL, \
+        white float NOT NULL, \
+        black float NOT NULL, \
+        gray float NOT NULL)"
+        self.mycursor.execute(table_creation_query);
+        self.mydb.commit()
+    
+    def video_table_insert(self, table_name, values):
+        table_insertion_query = "insert into " +table_name+" (date, video_id, car_id, timeframe, red, yellow, green, cyan, \
+            blue, pink, white, black, gray) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        self.mycursor.execute(table_insertion_query, values)
+        self.mydb.commit()
+
+
 
 ######################################################################
 
@@ -221,6 +285,48 @@ class predict_decoder(object):
             if chooce[pred[idx]]:
                 print('{}: {}'.format(name, chooce[pred[idx]]))
 
+
+######################################################################
+
+# Define the source and destination points for the bird's eye view transformation
+# src_points = np.float32([(763, 147), (79, 900), (1158, 141), (1779, 897)])
+src_points = np.float32([(102, 92), (36,777), (827, 68), (1527, 771)])
+# Clicked point: (488, 886)
+# Clicked point: (545, 230)
+# Clicked point: (1134, 213)
+# Clicked point: (1258, 890)
+dst_points = np.float32([[0, 0], [0, 1080], [1920, 0], [1920, 1080]])
+M = cv2.getPerspectiveTransform(src_points, dst_points)
+
+def find_bird_eye_distance(point1, point2):
+    # Find the distance between the two points in the bird's eye view
+    transformed_point1 = np.dot(M, np.array([point1[0], point1[1], 1]))
+    transformed_point1 /= transformed_point1[2]
+    transformed_point2 = np.dot(M, np.array([point2[0], point2[1], 1]))
+    transformed_point2 /= transformed_point2[2]
+    distance_birdseye = np.sqrt((transformed_point1[0] - transformed_point2[0]) ** 2 + (transformed_point1[1] - transformed_point2[1]) ** 2)
+    return distance_birdseye;
+
+def find_direction(prev_coord, curr_coord):
+    transf_prev_coord = np.dot(M, np.array([prev_coord[0], prev_coord[1], 1]))
+    transf_prev_coord /= transf_prev_coord[2]
+    transf_curr_coord = np.dot(M, np.array([curr_coord[0], curr_coord[1], 1]))
+    transf_curr_coord /= transf_curr_coord[2]
+    # Calculate the displacement vector between the object's positions in the two frames
+    dx, dy = transf_curr_coord[0] - transf_prev_coord[0], transf_curr_coord[1] - transf_prev_coord[1]
+
+    # Calculate the direction of the object's motion in degrees
+    direction = np.arctan2(dy, dx) * 180 / np.pi
+
+    return int(90-direction)
+
+def find_speed(prev_coord, curr_coord, fps, frame_skip):
+    distance = find_bird_eye_distance(prev_coord, curr_coord)
+    # distance = np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+    total_frames = frame_skip if frame_skip else 1
+    time = total_frames/fps;
+    return int(distance/time);
+
 ######################################################################
 
 
@@ -236,7 +342,7 @@ def run(
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
-        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        device=0,  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         show_vid=False,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
@@ -265,7 +371,8 @@ def run(
         backbone="resnet50",
         use_id=True,
         frame_skip=0,
-        save_db=False #save to SQL database
+        save_db=False, #save to SQL database
+        detect_anamoly=False
 ):
 
     source = str(source)
@@ -276,6 +383,7 @@ def run(
     if is_url and is_file:
         source = check_file(source)  # download
     video_id = source[:-4]
+    fps = cv2.VideoCapture(source).get(cv2.CAP_PROP_FPS)
     
 
     # Directories
@@ -330,6 +438,9 @@ def run(
         # creating video table
         db.create_video_table(video_id)
 
+        db2 = CarDatabase()
+        db2.create_video_table(video_id)
+
     # Run tracking
     #model.warmup(imgsz=(1 if pt else nr_sources, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile(), Profile())
@@ -337,6 +448,7 @@ def run(
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
 
         # skipping frames
+        t1 = time.time()
         if(frame_skip!=0 and frame_idx%frame_skip!=0):
             continue;
 
@@ -361,11 +473,13 @@ def run(
                 pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
             else:
                 pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-            
+        
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
             seen += 1
+            t2=time.time()
+
             if webcam:  # nr_sources >= 1
                 p, im0, _ = path[i], im0s[i].copy(), dataset.count
                 p = Path(p)  # to Path
@@ -391,10 +505,13 @@ def run(
 
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             
-            if hasattr(tracker_list[i], 'tracker') and hasattr(tracker_list[i].tracker, 'camera_update'):
-                if prev_frames[i] is not None and curr_frames[i] is not None:  # camera motion compensation
-                    tracker_list[i].tracker.camera_update(prev_frames[i], curr_frames[i])
+            
+            # if hasattr(tracker_list[i], 'tracker') and hasattr(tracker_list[i].tracker, 'camera_update'):
+            #     if prev_frames[i] is not None and curr_frames[i] is not None:  # camera motion compensation
+            #         tracker_list[i].tracker.camera_update(prev_frames[i], curr_frames[i])
 
+            t3=time.time()
+            
             if det is not None and len(det):
                 # below part is to show red and bounding box over cropped image
                 if is_seg:
@@ -408,12 +525,12 @@ def run(
                         
                     # Mask plotting
                     # below code is used to apply red color to the exact entity
-                    annotator.masks(
-                        masks,
-                        colors=[colors(x, True) for x in det[:, 5]],
-                        im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
-                        255 if retina_masks else im[i]
-                    )
+                    # annotator.masks(
+                    #     masks,
+                    #     colors=[colors(x, True) for x in det[:, 5]],
+                    #     im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
+                    #     255 if retina_masks else im[i]
+                    # )
                 else:
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 
@@ -422,9 +539,15 @@ def run(
                     n = (det[:, 5] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
+                t4= time.time()
+
                 # pass detections to strongsort
                 with dt[3]:
                     outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                
+                t5= time.time()
+                
+
                 
                 # draw boxes for visualization
                 if len(outputs[i]) > 0:
@@ -434,6 +557,14 @@ def run(
                         id = output[4]
                         cls = output[5]
                         conf = output[6]
+                        curr_center = output[7][-1][1]
+                        prev_center = (0,0) if len(output[7])==1 else output[7][-2][1]
+                        nth_center = (0, 0) if len(output[7])<10 else output[7][-10][1];
+                        if(id==1):
+                            print(frame_idx)
+                            print(prev_center, curr_center)
+                        speed = find_speed(prev_center, curr_center, fps, frame_skip)
+                        direction = find_direction(nth_center, curr_center)
 
                         if save_txt:
                             # to MOT format
@@ -449,10 +580,16 @@ def run(
                         if save_vid or save_crop or show_vid or save_db:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
-                            label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
-                            color = colors(c, True)
-                            annotator.box_label(bboxes, label, color=color)
+
+                            if(not detect_anamoly or (detect_anamoly and (direction>90 or direction<-90))):
+                                label = None if hide_labels else (f'{speed} {direction}' if hide_conf else \
+                                    (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
+                                color = colors(c, True)
+                                annotator.box_label(bboxes, label, color=color)
+                            else:
+                                label = None
+                                color = colors(c, True)
+                            # annotator.box_label(bboxes, label, color=color)
 
                             if save_trajectories and tracking_method == 'strongsort':
                                 q = output[7]
@@ -461,12 +598,11 @@ def run(
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 # save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                                 image_file_name = str(date)+"_"+video_id+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
-                                # print("============", type(save_dir))
-                                save_dir2 = Path("../../../var/www/html/CCTV/php/images")
-                                crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir2 / f'{video_id}' / f'{image_file_name}.jpg', BGR=True)
+                                # print("============", save_dir)
+                                crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
                                 # getting attributes using PAR
                                 # tracking only persons (class 0)
-                                if(c==0 and save_db and len(crop)!=0):
+                                if(c==0 and len(crop)!=0):
                                     t6 = time_sync()
                                     crop_image = load_image(Image.fromarray(crop[..., ::-1]))
                                     if not use_id:
@@ -480,13 +616,22 @@ def run(
                                     values.insert(0, str(date))
                                     # print(values)
                                     # adding values to the database
-                                    db.video_table_insert(video_id, values)
-                                    # mycursor.execute(query, values)
-                                    # mydb.commit()
-                                    # pred = torch.gt(out, torch.ones_like(out)/2 )  # threshold=0.5
-                                    # Dec.decode(pred)
+                                    # db.video_table_insert(video_id, values)
                                     t7 = time_sync();
-                
+                                    print("##__-----________________--------", t7-t6) 
+                                
+                                if(c==2 and save_db and len(crop)!=0):
+                                    t6 = time_sync()
+                                    carColor , idx = findColor(crop)
+
+                                    values = [str(date), str(video_id), str(id), str(frame_idx),0, 0 ,0, 0, 0, 0, 0, 0, 0]
+                                    values[idx+4] = 1
+                                    db2.video_table_insert(video_id, values)
+                                    t7 = time_sync();
+                                    print("##__-----________________--------", t7-t6) 
+
+                                
+               
             else:
                 pass
                 #tracker_list[i].tracker.pred_n_update_all_tracks()
@@ -519,13 +664,22 @@ def run(
                 vid_writer[i].write(im0)
 
             prev_frames[i] = curr_frames[i]
-            
+        t6 = time.time()    
+        # print("##__-----________________--------", t2-t1)
+        # print("##__-----________________--------", t3-t2)
+        # print("##__-----________________--------", t4-t3)
+        # print("##__-----________________--------", t5-t4) 
+        # print("##__-----________________--------", t6-t5)
+        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx')
+      
         # Print total time (preprocessing + inference + NMS + tracking)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{sum([dt.dt for dt in dt if hasattr(dt, 'dt')]) * 1E3:.1f}ms")
     
     # inserting new video data on main table
     if save_db:
         db.main_table_insert(video_id)
+        db2.main_table_insert(video_id)
+    
 
 
     # Print results
@@ -579,10 +733,11 @@ def parse_opt():
     parser.add_argument('--use-id', action='store_true', help='use identity loss for PAR')
     parser.add_argument('--frame-skip', default=0, type=int, help='number of frames to skip')
     parser.add_argument('--save-db', action='store_true', help='save to SQL database')
+    parser.add_argument('--detect-anamoly', help="detect outliers in a video")
     opt = parser.parse_args()
     assert opt.dataset in ['market', 'duke']
     assert opt.backbone in ['resnet50', 'resnet34', 'resnet18', 'densenet121']
-    opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
+    opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  #expand
     print_args(vars(opt))
     return opt
 
@@ -595,3 +750,10 @@ def main(opt):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+
+
+
+
+
+
+#python car.py --source video_14.avi --reid-weights osnet_x0_25_msmt17.pt --yolo-weights yolov5m.pt --save-db --save-crop --frame-skip 20 --classes 0, 2, 3, 5, 7
