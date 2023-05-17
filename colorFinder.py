@@ -6,7 +6,7 @@ import cv2
 import colorsys
 from collections import Counter
 from sklearn.mixture import GaussianMixture as GMM
-clt_gmm = GMM(n_components=1)
+clt_gmm = GMM(n_components=2)
 
 def rgb_to_hsv(c):
     c = np.array(c)/255
@@ -51,10 +51,7 @@ def findColor(img):
     clt_1 = clt_gmm.fit(img.reshape(-1, 3))
     clr = palette_perc(clt_1, img)
     # show_img_compar(img, pallete)
-    # print(clr)
     hsvClr = rgb_to_hsv(clr)
-
-    # print(hsvClr)
     if hsvClr[2]<=0.1:
         idx = 7
         hue = "black"
@@ -70,4 +67,23 @@ def findColor(img):
         hue , idx= hueRange(hue)
     
     return hue, idx
+
+# img = plt.imread("car1.jpg")
+# print(findColor(img))
+
+# img = plt.imread("car2.jpg")
+# print(findColor(img))
+# img = plt.imread("car3.jpg")
+# print(findColor(img))
+# img = plt.imread("car4.jpg")
+# print(findColor(img))
+# img = plt.imread("car5.jpg")
+# print(findColor(img))
+
+# img = plt.imread("car6.jpg")
+# print(findColor(img))
+# img = plt.imread("car7.jpg")
+# print(findColor(img))
+# img = plt.imread("car8.jpg")
+# print(findColor(img))
 

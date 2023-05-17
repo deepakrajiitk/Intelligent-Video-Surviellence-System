@@ -1,1 +1,1 @@
-ffmpeg -i source-file.foo -ss  600 -t 600 second-10-min.m4v
+ffmpeg -i video_6.avi -vcodec copy -acodec copy -ss 01:40:00 -t 02:00:00 video_13.avi

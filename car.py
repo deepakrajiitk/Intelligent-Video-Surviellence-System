@@ -23,6 +23,7 @@ from datetime import timedelta
 
 
 from colorFinder import *
+from find_car_color import *
 
 
 FILE = Path(__file__).resolve()
@@ -87,7 +88,7 @@ class Database:
         self.table_name = "cctv_table"
         self.threshold = 0.5
         # table is created one time only
-        self.create_main_table()
+        # self.create_main_table()
 
     def create_main_table(self):
         # query format
@@ -104,13 +105,17 @@ class Database:
     
     def main_table_insert(self, video_id):
         column_name = video_id
-        query1 = "alter table " +self.table_name+ " add column if not exists " +column_name+ " int"
-        print(query1)
-        self.mycursor.execute(query1)
+        check_query = "SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = '{}' AND COLUMN_NAME = '{}'".format(self.table_name, column_name)
+        self.mycursor.execute(check_query)
+        result = self.mycursor.fetchone()
+        if result is None:
+            query1 = "ALTER TABLE {} ADD COLUMN {} INT".format(self.table_name, column_name)
+            self.mycursor.execute(query1)
+
         for i in range(len(self.attributes)):
-            query2 = "update " +self.table_name+ " set " +column_name+ " = " + "(select count(*) from " +column_name+ " where " +self.attributes[i]+ ">" +str(self.threshold)+ ") " + " where attributes = '" +self.attributes[i]+ "'";
-            # print(query2)
+            query2 = "UPDATE {} SET {} = (SELECT COUNT(*) FROM {} WHERE {} > {}) WHERE attributes = '{}'".format(self.table_name, column_name, column_name, self.attributes[i], self.threshold, self.attributes[i])
             self.mycursor.execute(query2)
+
         self.mydb.commit()
     
     def create_video_table(self, table_name):
@@ -177,8 +182,8 @@ class CarDatabase:
         )
         self.mydb.set_converter_class(NumpyMySQLConverter)
         self.mycursor = self.mydb.cursor()
-        self.attributes = ["red", "yellow", "green", "cyan", "blue", "pink", "white", "black", "gray"]
-        self.table_name = "car_table"
+        self.attributes = ["red", "yellow", "green", "teal", "blue", "pink", "white", "black", "gray"]
+        self.table_name = "car_table2"
         self.threshold = 0.5
         # table is created one time only
         self.create_main_table()
@@ -198,13 +203,17 @@ class CarDatabase:
     
     def main_table_insert(self, video_id):
         column_name = video_id
-        query1 = "alter table " +self.table_name+ " add column if not exists " +column_name+ " int"
-        print(query1)
-        self.mycursor.execute(query1)
+        check_query = "SELECT * FROM information_schema.COLUMNS WHERE TABLE_NAME = '{}' AND COLUMN_NAME = '{}'".format(self.table_name, column_name)
+        self.mycursor.execute(check_query)
+        result = self.mycursor.fetchone()
+        if result is None:
+            query1 = "ALTER TABLE {} ADD COLUMN {} INT".format(self.table_name, column_name)
+            self.mycursor.execute(query1)
+
         for i in range(len(self.attributes)):
-            query2 = "update " +self.table_name+ " set " +column_name+ " = " + "(select count(*) from " +column_name+ " where " +self.attributes[i]+ ">" +str(self.threshold)+ ") " + " where attributes = '" +self.attributes[i]+ "'";
-            # print(query2)
+            query2 = "UPDATE {} SET {} = (SELECT COUNT(*) FROM {} WHERE {} > {}) WHERE attributes = '{}'".format(self.table_name, column_name, column_name, self.attributes[i], self.threshold, self.attributes[i])
             self.mycursor.execute(query2)
+
         self.mydb.commit()
     
     def create_video_table(self, table_name):
@@ -216,7 +225,7 @@ class CarDatabase:
         red float NOT NULL, \
         yellow float NOT NULL, \
         green float NOT NULL, \
-        cyan float NOT NULL, \
+        teal float NOT NULL, \
         blue float NOT NULL, \
         pink float NOT NULL, \
         white float NOT NULL, \
@@ -226,10 +235,11 @@ class CarDatabase:
         self.mydb.commit()
     
     def video_table_insert(self, table_name, values):
-        table_insertion_query = "insert into " +table_name+" (date, video_id, car_id, timeframe, red, yellow, green, cyan, \
+        table_insertion_query = "insert into " +table_name+" (date, video_id, car_id, timeframe, red, yellow, green, teal, \
             blue, pink, white, black, gray) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         self.mycursor.execute(table_insertion_query, values)
         self.mydb.commit()
+
 
 
 
@@ -432,7 +442,7 @@ def run(
                 tracker_list[i].model.warmup()
     outputs = [None] * nr_sources
 
-    # creating database object
+    # # creating database object
     if save_db:
         db = Database()
         # creating video table
@@ -560,9 +570,9 @@ def run(
                         curr_center = output[7][-1][1]
                         prev_center = (0,0) if len(output[7])==1 else output[7][-2][1]
                         nth_center = (0, 0) if len(output[7])<10 else output[7][-10][1];
-                        if(id==1):
-                            print(frame_idx)
-                            print(prev_center, curr_center)
+                        # if(id==1):
+                        #     print(frame_idx)
+                        #     print(prev_center, curr_center)
                         speed = find_speed(prev_center, curr_center, fps, frame_skip)
                         direction = find_direction(nth_center, curr_center)
 
@@ -599,8 +609,14 @@ def run(
                                 # save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                                 image_file_name = str(date)+"_"+video_id+"_"+names[c]+"_"+str(id)+"_"+str(frame_idx);
                                 # print("============", save_dir)
-                                crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
+                                # crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
+                                
+                                save_dir2 = Path("../../../var/www/html/CCTV/php/images")
+                                crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir2 / f'{video_id}' / f'{image_file_name}.jpg', BGR=True)
+                                
                                 # getting attributes using PAR
+                                
+                                
                                 # tracking only persons (class 0)
                                 if(c==0 and len(crop)!=0):
                                     t6 = time_sync()
@@ -616,19 +632,31 @@ def run(
                                     values.insert(0, str(date))
                                     # print(values)
                                     # adding values to the database
-                                    # db.video_table_insert(video_id, values)
-                                    t7 = time_sync();
-                                    print("##__-----________________--------", t7-t6) 
+                                    db.video_table_insert(video_id, values)
+                                    t7 = time_sync()
+                                    # print("##__-----________________--------", t7-t6) 
                                 
                                 if(c==2 and save_db and len(crop)!=0):
                                     t6 = time_sync()
-                                    carColor , idx = findColor(crop)
+                                    try:
+                                        color_name = process_image(crop)
+                                        # carColor , idx = findColor(crop)
+                                        values = [str(date), str(video_id), str(id), str(frame_idx),0, 0 ,0, 0, 0, 0, 0, 0, 0]
+                                        # print(carColor)
+                                        # values[idx+4] = 1
+                                        # print(values)
 
-                                    values = [str(date), str(video_id), str(id), str(frame_idx),0, 0 ,0, 0, 0, 0, 0, 0, 0]
-                                    values[idx+4] = 1
-                                    db2.video_table_insert(video_id, values)
-                                    t7 = time_sync();
-                                    print("##__-----________________--------", t7-t6) 
+                                        color_name = color_name.lower()
+                                        car_colors = ['red', 'yellow', 'green', 'teal', 'blue', 'pink', 'white', 'black', 'gray']
+                                        values[car_colors.index(color_name) + 4] = 1
+                                        db2.video_table_insert(video_id, values)
+                                        t7 = time_sync()
+                                        # print("##__-----________________--------", t7-t6) 
+                                    except:
+                                        print("got an error with car color")
+
+
+                                    
 
                                 
                
@@ -670,7 +698,6 @@ def run(
         # print("##__-----________________--------", t4-t3)
         # print("##__-----________________--------", t5-t4) 
         # print("##__-----________________--------", t6-t5)
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx')
       
         # Print total time (preprocessing + inference + NMS + tracking)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{sum([dt.dt for dt in dt if hasattr(dt, 'dt')]) * 1E3:.1f}ms")
@@ -680,10 +707,13 @@ def run(
         db.main_table_insert(video_id)
         db2.main_table_insert(video_id)
     
-
+    
 
     # Print results
-    t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
+    if(seen):
+        t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
+    else:
+        t=0
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS, %.1fms {tracking_method} update per image at shape {(1, 3, *imgsz)}' % t)
     if save_txt or save_vid:
         s = f"\n{len(list(save_dir.glob('tracks/*.txt')))} tracks saved to {save_dir / 'tracks'}" if save_txt else ''
