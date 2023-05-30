@@ -76,9 +76,9 @@ class Database:
         # connecting to database
         self.mydb = mysql.connector.connect(
         host="localhost",
-        user="deepak",
-        password="deepak",
-        database="cctv_database"
+        user="root",
+        password="",
+        database="tracker_db"
         )
         self.mydb.set_converter_class(NumpyMySQLConverter)
         self.mycursor = self.mydb.cursor()
@@ -176,17 +176,17 @@ class CarDatabase:
         # connecting to database
         self.mydb = mysql.connector.connect(
         host="localhost",
-        user="deepak",
-        password="deepak",
-        database="car_database"
+        user="root",
+        password="",
+        database="tracker_car_db"
         )
         self.mydb.set_converter_class(NumpyMySQLConverter)
         self.mycursor = self.mydb.cursor()
         self.attributes = ["red", "yellow", "green", "teal", "blue", "pink", "white", "black", "gray"]
-        self.table_name = "car_table2"
+        self.table_name = "car_table"
         self.threshold = 0.5
         # table is created one time only
-        self.create_main_table()
+        # self.create_main_table()
 
     def create_main_table(self):
         # query format
@@ -392,8 +392,10 @@ def run(
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
     if is_url and is_file:
         source = check_file(source)  # download
-    video_id = source[:-4]
+    file_name = os.path.basename(source)
+    video_id = os.path.splitext(file_name)[0]
     fps = cv2.VideoCapture(source).get(cv2.CAP_PROP_FPS)
+    print("------------------", fps)
     
 
     # Directories
@@ -456,6 +458,17 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile(), Profile())
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
+
+        # Calculate the time in seconds
+        time_in_seconds = frame_idx / fps
+
+        # Convert seconds to hours, minutes, and remaining seconds
+        hours = int(time_in_seconds // 3600)
+        minutes = int((time_in_seconds % 3600) // 60)
+        seconds = int(time_in_seconds % 60)
+
+        # video_time = hours + ":" + minutes + ":" + seconds;
+
 
         # skipping frames
         t1 = time.time()
@@ -611,7 +624,7 @@ def run(
                                 # print("============", save_dir)
                                 # crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{image_file_name}.jpg', BGR=True)
                                 
-                                save_dir2 = Path("../../../var/www/html/CCTV/php/images")
+                                save_dir2 = Path("/opt/lampp/htdocs/CCTV/php/images")
                                 crop = save_one_box(bboxes.astype(np.float32), imc, file=save_dir2 / f'{video_id}' / f'{image_file_name}.jpg', BGR=True)
                                 
                                 # getting attributes using PAR
